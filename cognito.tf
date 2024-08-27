@@ -1,5 +1,5 @@
-resource "aws_cognito_user_pool" "knz_user_pool" {
-    name = "${var.env}-user-pool"
+resource "aws_cognito_user_pool" "user_pool" {
+    name = "${var.env}-${var.prodect}-user-pool"
   # Sign-in options
   alias_attributes = ["email", "phone_number"]
 
@@ -75,8 +75,8 @@ resource "aws_cognito_user_pool" "knz_user_pool" {
 }
 
 resource "aws_cognito_user_pool_client" "mobile_app_client" {
-  name                          = "${var.env}-mobile"
-  user_pool_id                  = aws_cognito_user_pool.knz_user_pool.id
+  name                          = "${var.env}-${var.prodect}-mobile"
+  user_pool_id                  = aws_cognito_user_pool.user_pool.id
   prevent_user_existence_errors = "ENABLED"
 
   # Client settings
@@ -117,7 +117,7 @@ data "archive_file" "post_confirmation_lambda_zip" {
 
 resource "aws_lambda_function" "post_confirmation_lambda" {
   filename         = data.archive_file.post_confirmation_lambda_zip.output_path
-  function_name    = "${var.env}-post-confirmation-dynamodb"
+  function_name    = "${var.env}-${var.prodect}-post-confirmation"
   role             = aws_iam_role.lambda_role.arn
   handler          = "post-confirmation.lambda_handler"
   runtime          = "python3.12"
@@ -133,7 +133,7 @@ resource "aws_lambda_function" "post_confirmation_lambda" {
 }
 
 resource "aws_iam_role" "lambda_role" {
-  name = "${var.env}-post-confirmation-dynamodb"
+  name = "${var.env}-${var.prodect}-post-confirmation"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
@@ -150,7 +150,7 @@ resource "aws_iam_role" "lambda_role" {
 }
 
 resource "aws_iam_policy" "lambda_dynamodb_policy" {
-  name        = "post-confirmation-dynamodb-policy"
+  name        = "${var.env}-${var.prodect}-post-confirmation-policy"
   description = "IAM policy for Lambda to access DynamoDB"
   
   policy = jsonencode({
@@ -173,12 +173,12 @@ resource "aws_iam_role_policy_attachment" "lambda_dynamodb_policy_attachment" {
 }
 
 resource "aws_cloudwatch_log_group" "post_confirmation_log_group" {
-  name              = "/aws/lambda/${var.env}-post-confirmation-dynamodb"
+  name              = "/aws/lambda/${var.env}-${var.prodect}-post-confirmation"
   retention_in_days = 7  # Optional: Set log retention period
 }
 
 resource "aws_iam_policy" "lambda_cloudwatch_policy" {
-  name        = "${var.env}-lambda-cloudwatch-policy"
+  name        = "${var.env}-${var.prodect}-lambda-cloudwatch-policy"
   description = "IAM policy for Lambda to access CloudWatch Logs"
 
   policy = jsonencode({
@@ -203,7 +203,7 @@ resource "aws_iam_role_policy_attachment" "lambda_cloudwatch_policy_attachment" 
 }
 
 resource "aws_iam_role" "cognito_lambda_invoke_role" {
-  name = "${var.env}-cognito-lambda-invoke-role"
+  name = "${var.env}-${var.prodect}-cognito-lambda-invoke-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
@@ -227,7 +227,7 @@ resource "aws_lambda_permission" "allow_cognito_invoke" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.post_confirmation_lambda.function_name
   principal     = "cognito-idp.amazonaws.com"
-  source_arn    = aws_cognito_user_pool.knz_user_pool.arn
+  source_arn    = aws_cognito_user_pool.user_pool.arn
   source_account = data.aws_caller_identity.current.account_id
 }
 

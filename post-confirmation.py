@@ -11,7 +11,7 @@ logger.setLevel(logging.INFO)
 
 # Initialize DynamoDB resource and table
 dynamodb = boto3.resource('dynamodb')
-table_name = os.getenv('TABLE_NAME', 'bah-dknz-users')  # Use environment variable for table name
+table_name = os.getenv('TABLE_NAME', 'dev-fead-users')  # Use environment variable for table name
 table = dynamodb.Table(table_name)
 
 def store_user_data(user_id: str, email: str, username: str) -> None:
