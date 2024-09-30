@@ -1,16 +1,23 @@
 resource "aws_cognito_user_pool" "user_pool" {
     name = "${var.env}-${var.product}-user-pool"
-  # Sign-in options
-  alias_attributes = ["email", "phone_number"]
 
-  # Username case sensitivity
-  username_configuration {
-    case_sensitive = false
-  }
-  lambda_config {
-      post_confirmation = aws_lambda_function.post_confirmation_lambda.arn
+    # Sign-in options
+    alias_attributes = ["email", "phone_number","preferred_username"]
+
+    # Username case sensitivity
+    username_configuration {
+      case_sensitive = false
     }
-  # Password policy
+
+    # Add the SMS configuration for phone number verification
+    sms_configuration {
+      external_id = "CognitoSMSRole"
+      sns_caller_arn = aws_iam_role.cognito_sms_role.arn
+    }
+    lambda_config {
+        post_confirmation = aws_lambda_function.post_confirmation_lambda.arn
+      }
+    # Password policy
     password_policy {
       minimum_length    = 8
       require_lowercase = true
@@ -20,60 +27,102 @@ resource "aws_cognito_user_pool" "user_pool" {
     }
   
 
-  # MFA configuration
-  mfa_configuration = "OFF"
+    # MFA configuration
+    mfa_configuration = "OFF"
 
-  # Account recovery settings
-  account_recovery_setting {
-    recovery_mechanism {
-      name     = "verified_email"
-      priority = 1
+    # Account recovery settings (prefer phone number recovery)
+    account_recovery_setting {
+      recovery_mechanism {
+        name     = "verified_phone_number"  # Use phone for account recovery
+        priority = 1
+      }
+      recovery_mechanism {
+        name     = "verified_email"
+        priority = 2
+      }
     }
-  }
 
-  # Verification settings
-  verification_message_template {
-    default_email_option = "CONFIRM_WITH_CODE"
-    email_message        = "Your verification code is {####}."
-    email_subject        = "Your verification code"
-    email_message_by_link = "Click the following link to verify your email: {##Verify Email##}"
-    email_subject_by_link = "Verify your email address"
-  }
+    # Verification message settings (for phone number verification)
+    verification_message_template {
+      default_email_option     = "CONFIRM_WITH_CODE"
+      email_message            = "كود التحقق الخاص بك هو {####}."
+      email_subject            = "كود التحقق الخاص بك"
+      email_message_by_link    = "اضغط على الرابط التالي للتحقق من بريدك الإلكتروني: {##Verify Email##}"
+      email_subject_by_link    = "تحقق من بريدك الإلكتروني"
+      sms_message              = "كود التحقق الخاص بك هو {####}."
+    }
 
-  # Verification configuration
-  auto_verified_attributes = ["email"]
+    # Verification configuration
+    auto_verified_attributes = ["phone_number"]
 
-  # Required attributes
-  schema {
-    attribute_data_type = "String"
-    name                = "email"
-    required            = true
-    mutable             = true
-  }
+    # Required attributes
+    # Schema for email and phone_number (phone_number is required)
+    schema {
+      attribute_data_type = "String"
+      name                = "phone_number"
+      required            = true
+      mutable             = true
+    }
+    # Optional email attribute
+    schema {
+      attribute_data_type = "String"
+      name                = "email"
+      required            = false  # Email is optional
+      mutable             = true
+    }
 
-  # Self-registration settings
-  admin_create_user_config {
-    allow_admin_create_user_only = false
-  }
+    # Self-registration settings
+    admin_create_user_config {
+      allow_admin_create_user_only = false
+    }
 
-#   # Email configuration
-#   email_configuration {
-#     email_sending_account = "COGNITO_DEFAULT"
-#     from_email_address    = "no-reply@verificationemail.com"
-#     reply_to_email_address = "no-reply@verificationemail.com"
-#     source_arn            = "arn:aws:ses:me-south-1:123456789012:identity/no-reply@verificationemail.com" # Replace with actual SES identity ARN
-#   }
+    # Tags
+    tags = {
+      env = "${var.env}"
+    }
 
-  # Tags
-  tags = {
-    env = "${var.env}"
-  }
-
-  # Deletion protection
-  deletion_protection = "ACTIVE"
+    # Deletion protection
+    deletion_protection = "ACTIVE"
+    lifecycle {
+      ignore_changes = [
+        schema,  # This prevents Terraform from trying to update the schema
+      ]
+    }
   
 }
+# IAM Role for Cognito to send SMS using SNS
+resource "aws_iam_role" "cognito_sms_role" {
+  name = "${var.env}-${var.product}-cognito-sms-role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Principal = {
+          Service = "cognito-idp.amazonaws.com"
+        },
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
 
+# Policy that allows Cognito to use SNS for sending SMS
+resource "aws_iam_role_policy" "cognito_sms_policy" {
+  name = "${var.env}-${var.product}-cognito-sms-policy"
+  role = aws_iam_role.cognito_sms_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = "sns:Publish",
+        Resource = "*"
+      }
+    ]
+  })
+}
 resource "aws_cognito_user_pool_client" "mobile_app_client" {
   name                          = "${var.env}-${var.product}-mobile"
   user_pool_id                  = aws_cognito_user_pool.user_pool.id
@@ -81,17 +130,17 @@ resource "aws_cognito_user_pool_client" "mobile_app_client" {
 
   # Client settings
   allowed_oauth_flows = ["code"]  # Authorization code grant
-  allowed_oauth_scopes = ["email", "openid", "phone"]
+  allowed_oauth_scopes = ["email", "openid", "phone"]  # Allow email and phone
   allowed_oauth_flows_user_pool_client = true
   callback_urls        = ["http://localhost"]
   logout_urls          = []
   default_redirect_uri = "http://localhost"
   supported_identity_providers = ["COGNITO"]
 
- # Token expiration settings
+  # Token expiration settings
   refresh_token_validity      = 565   # in days
-  access_token_validity       = 24  # in minutes (1 day)
-  id_token_validity           = 24  # in minutes (1 day)
+  access_token_validity       = 24  # in hours (1 day)
+  id_token_validity           = 24  # in hours (1 day)
   auth_session_validity       = 15    # Authentication session duration in minutes
 
   # Authentication flows
@@ -105,8 +154,8 @@ resource "aws_cognito_user_pool_client" "mobile_app_client" {
 
   # Hosted UI settings
   generate_secret = false  # Set to true if a client secret is required
-
 }
+
 
 data "archive_file" "post_confirmation_lambda_zip" {
   type        = "zip"
@@ -125,7 +174,7 @@ resource "aws_lambda_function" "post_confirmation_lambda" {
 
   environment {
     variables = {
-      TABLE_NAME = aws_dynamodb_table.users_table.name
+      TABLE_NAME = aws_dynamodb_table.fead_table.name
     }
   }
 
@@ -161,7 +210,7 @@ resource "aws_iam_policy" "lambda_dynamodb_policy" {
           "dynamodb:PutItem"
         ],
         Effect = "Allow",
-        Resource = aws_dynamodb_table.users_table.arn
+        Resource = aws_dynamodb_table.fead_table.arn
       }
     ]
   })

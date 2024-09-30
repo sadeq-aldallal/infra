@@ -11,24 +11,25 @@ logger.setLevel(logging.INFO)
 
 # Initialize DynamoDB resource and table
 dynamodb = boto3.resource('dynamodb')
-table_name = os.getenv('TABLE_NAME', 'dev-fead-users')  # Use environment variable for table name
+table_name = os.getenv('TABLE_NAME', 'dev-fead')  # Use environment variable for table name
 table = dynamodb.Table(table_name)
 
-def store_user_data(user_id: str, email: str, username: str) -> None:
+def store_user_data(user_id: str, phone_number: str) -> None:
     """
-    Stores user data in the DynamoDB table.
+    Stores user data in the DynamoDB table with metadata.
 
     :param user_id: The user's unique identifier (UUID).
-    :param email: The user's email address.
-    :param username: The user's username.
+    :param phone_number: The user's phone number.
     """
     try:
-        logger.info(f"Storing user data for id: {user_id}, email: {email}, username: {username}")
+        logger.info(f"Storing user data for id: {user_id}, phone_number: {phone_number}")
         table.put_item(
             Item={
-                'id': user_id,     # Hash key as per the table definition
-                'email': email,    # Email attribute
-                'username': username  # Username attribute
+                'PK': f'USER#{user_id}',     # Partition key
+                'SK': f'USER#{user_id}',     # Sort key
+                'Metadata': {                # Store phone_number in metadata object
+                    'phone_number': phone_number
+                }
             }
         )
     except ClientError as e:
@@ -44,14 +45,14 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     :param context: The runtime context provided by AWS Lambda.
     :return: The original event data.
     """
-    user_id = event['request']['userAttributes']['sub']
-    email = event['request']['userAttributes']['email']
-    username = event['userName']  # Get the username from the event
+    print(event)
+    user_id = event['userName']
+    phone_number = event['request']['userAttributes'].get('phone_number')  # Get phone number from attributes
     
-    logger.info(f"Received post-confirmation event for user_id: {user_id}, email: {email}, username: {username}")
+    logger.info(f"Received post-confirmation event for user_id: {user_id}, phone_number: {phone_number}")
     
     # Store user data in DynamoDB
-    store_user_data(user_id, email, username)
+    store_user_data(user_id, phone_number)
     
     logger.info("User data successfully stored.")
     
