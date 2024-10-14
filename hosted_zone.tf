@@ -34,6 +34,18 @@ resource "aws_route53_record" "bsiness_static_website" {
     zone_id                = aws_cloudfront_distribution.bsiness_static_website_dev.hosted_zone_id
   }
 }
+resource "aws_route53_record" "fead_app_website" {
+  name    = local.fead_app_website_domain
+  type    = "A"
+  zone_id = aws_route53_zone.prod.id
+
+
+  alias {
+    evaluate_target_health = false
+    name                   = aws_cloudfront_distribution.fead_app_website.domain_name
+    zone_id                = aws_cloudfront_distribution.fead_app_website.hosted_zone_id
+  }
+}
 
 # Wildcard certs for prod and dev in me-east-1
 
@@ -98,8 +110,9 @@ resource "aws_acm_certificate_validation" "dev" {
 
 resource "aws_acm_certificate" "prod_us" {
   provider          = aws.vir
-  domain_name       = "*.${var.product}.app"
+  domain_name       = "${var.product}.app"
   validation_method = "DNS"
+  subject_alternative_names = ["*.${var.product}.app"]
 
   tags = {
     Env = "${var.env}-${var.product}"

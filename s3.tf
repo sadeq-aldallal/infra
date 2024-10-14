@@ -56,3 +56,26 @@ resource "aws_s3_bucket_ownership_controls" "business_static_website_ownership" 
   }
 }
 
+# ===========================
+# Fead website
+# ===========================
+resource "aws_s3_bucket" "fead_app_website" {
+  bucket = "${var.product}.app"
+  tags = {
+    Env = "${var.env}"
+  }
+}
+
+resource "aws_s3_bucket_policy" "fead_app_website_bucket_policy" {
+  bucket = aws_s3_bucket.fead_app_website.id
+  policy = data.aws_iam_policy_document.fead_app_website_cloudfront_oac_access.json
+}
+
+resource "aws_s3_bucket_ownership_controls" "fead_app_website_ownership" {
+  bucket = aws_s3_bucket.fead_app_website.id
+
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
