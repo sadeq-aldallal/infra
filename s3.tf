@@ -32,3 +32,27 @@ resource "aws_s3_bucket_policy" "shops_fead_policy" {
     ]
   })
 }
+
+# ===========================
+# Fead Business website
+# ===========================
+resource "aws_s3_bucket" "bsiness_static_website" {
+  bucket = "${var.env}.${var.product}.business.fead.app"
+  tags = {
+    Env = "${var.env}"
+  }
+}
+
+resource "aws_s3_bucket_policy" "bsiness_static_website_bucket_policy" {
+  bucket = aws_s3_bucket.bsiness_static_website.id
+  policy = data.aws_iam_policy_document.cloudfront_oac_access.json
+}
+
+resource "aws_s3_bucket_ownership_controls" "business_static_website_ownership" {
+  bucket = aws_s3_bucket.bsiness_static_website.id
+
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
