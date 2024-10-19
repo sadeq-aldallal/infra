@@ -11,10 +11,10 @@ logger.setLevel(logging.INFO)
 
 # Initialize DynamoDB resource and table
 dynamodb = boto3.resource('dynamodb')
-table_name = os.getenv('TABLE_NAME', 'dev-fead')  # Use environment variable for table name
+table_name = os.getenv('TABLE_NAME', 'dev-fead')
 table = dynamodb.Table(table_name)
 
-def store_user_data(user_id: str, phone_number: str) -> None:
+def store_user_data(user_id: str, phone_number: str, preferred_username: str) -> None:
     """
     Stores user data in the DynamoDB table with metadata.
 
@@ -25,9 +25,9 @@ def store_user_data(user_id: str, phone_number: str) -> None:
         logger.info(f"Storing user data for id: {user_id}, phone_number: {phone_number}")
         table.put_item(
             Item={
-                'PK': f'USER#{user_id}',     # Partition key
-                'SK': f'USER#{user_id}',     # Sort key
-                'Metadata': {                # Store phone_number in metadata object
+                'PK': f'USERNAME#{name}',
+                'SK': f'ID#{user_id}',
+                'Metadata': {
                     'phone_number': phone_number
                 }
             }
@@ -47,12 +47,13 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     print(event)
     user_id = event['userName']
-    phone_number = event['request']['userAttributes'].get('phone_number')  # Get phone number from attributes
+    phone_number = event['request']['userAttributes'].get('phone_number')
+    name = event['request']['userAttributes'].get('name')
     
     logger.info(f"Received post-confirmation event for user_id: {user_id}, phone_number: {phone_number}")
     
     # Store user data in DynamoDB
-    store_user_data(user_id, phone_number)
+    store_user_data(user_id, phone_numbe, name)
     
     logger.info("User data successfully stored.")
     
