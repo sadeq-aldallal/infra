@@ -14,7 +14,7 @@ dynamodb = boto3.resource('dynamodb')
 table_name = os.getenv('TABLE_NAME', 'dev-fead')
 table = dynamodb.Table(table_name)
 
-def store_user_data(user_id: str, phone_number: str, preferred_username: str) -> None:
+def store_user_data(user_id: str, phone_number: str, name: str) -> None:
     """
     Stores user data in the DynamoDB table with metadata.
 
