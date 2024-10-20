@@ -30,6 +30,7 @@ def store_user_data(user_id: str, phone_number: str, name: str) -> None:
                 'Metadata': {
                     'phone_number': phone_number
                 }
+                'ItemType' : 'user'
             }
         )
     except ClientError as e:
