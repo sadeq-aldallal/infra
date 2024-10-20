@@ -53,7 +53,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     logger.info(f"Received post-confirmation event for user_id: {user_id}, phone_number: {phone_number}")
     
     # Store user data in DynamoDB
-    store_user_data(user_id, phone_numbe, name)
+    store_user_data(user_id, phone_number, name)
     
     logger.info("User data successfully stored.")
     
